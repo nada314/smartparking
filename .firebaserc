@@ -1,0 +1,14 @@
+{
+    "targets": {
+        "smartparking-1ba32": {
+            "hosting": {
+                "smartparking": [
+                    "smartparking-1ba32"
+                ]
+            }
+        }
+    },
+    "projects": {
+        "default": "smartparking-1ba32"
+    }
+}
