@@ -271,3 +271,123 @@ int calculateParkingDuration(String cardId) {
   }
   return 0;
 }
+void loop() {
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+  
+  String content = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    content.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    content.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  content.toUpperCase();
+  String cardId = content.substring(1);
+  
+  bool authorized = (cardId == "0C 1B A8 6E");
+  bool spaceAvailable = (digitalRead(SENSOR1) == HIGH);
+  bool accessGranted = false;
+  bool cardInParking = checkCardInParking(cardId);
+  bool isExit = false;
+  int duration = 0;
+  int price;
+
+  if (!cardInParking) {
+    if (authorized) {
+      lcd.clear();
+      lcd.setCursor(0, 1);
+      lcd.print("Carte autorisee");
+      
+      if (spaceAvailable) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Place libre");
+        lcd.setCursor(0, 1);
+        lcd.print("Entree acceptee");
+        
+        digitalWrite(GREENLED, HIGH);
+        myServo.write(90);
+        accessGranted = true;
+        
+        delay(5000);
+        myServo.write(0);
+        digitalWrite(GREENLED, LOW);
+        
+        delay(2000);
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Parking Plein");
+        isVide = false;
+      } else {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Place occupee");
+        lcd.setCursor(0, 1);
+        lcd.print("Acces refuse");
+        
+        digitalWrite(REDLED, HIGH);
+        delay(2000);
+        digitalWrite(REDLED, LOW);
+
+        delay(4000);
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Parking Plein");
+        isVide = false;
+      }
+    } else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Carte inconnue");
+      lcd.setCursor(0, 1);
+      lcd.print("Acces refuse");
+      
+      digitalWrite(REDLED, HIGH);
+      delay(2000);
+      digitalWrite(REDLED, LOW);
+
+      delay(5000);
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      if (isVide) {
+        lcd.print("Parking Vide");
+      } else {
+        lcd.print("Parking Plein");
+      }
+    }
+    logAccessAttempt(cardId, authorized, spaceAvailable, accessGranted);
+  } else {
+    logAccessAttempt(cardId, authorized, spaceAvailable, true, true, 0, 0);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Sortie");
+    lcd.setCursor(0, 1);
+    lcd.print("Autorisee");
+    duration = calculateParkingDuration(cardId) / 1000;
+    price = duration / 2;
+    updateExitLog(duration, price);
+    Serial.println("price " + String(price));
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Duree: " + String(duration) + "s");
+    lcd.setCursor(0, 1);
+    lcd.print("Prix: " + String(price) + "euros");
+
+    delay(5000);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Parking Vide");
+    isVide = true;
+    
+    digitalWrite(GREENLED, HIGH);
+    myServo.write(90);
+    accessGranted = true;
+    isExit = true;
+    
+    delay(4000);
+    myServo.write(0);
+    digitalWrite(GREENLED, LOW);
+    
+    clearParkingStatus();
+  }  
+}
